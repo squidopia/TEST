@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>The Journey - P1</title>
+
 <style>
 body {
     margin: 0;
@@ -36,8 +37,21 @@ h1 {
     text-align: center;
     display: none;
 }
+
+/* 💀 Fake crash screen */
+#crashScreen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: white;
+    display: none;
+    z-index: 999;
+}
 </style>
 </head>
+
 <body>
 
 <h1>The Journey - P1</h1>
@@ -48,9 +62,12 @@ h1 {
     <p>Secret Code: !K32NjM.S[E/p@</p>
 </div>
 
+<div id="crashScreen"></div>
+
 <script>
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
+const crashScreen = document.getElementById("crashScreen");
 
 let player = {
     x: 50,
@@ -65,10 +82,12 @@ let player = {
 let gravity = 0.6;
 let keys = {};
 let cameraX = 0;
+
 let orbsCollected = 0;
-let buildCharges = 0;
+let buildCharges = 1; // ✅ start with 1
 
 let worldWidth = 5000;
+let dead = false;
 
 // Platforms
 let platforms = [];
@@ -98,9 +117,9 @@ for (let i = 0; i < 20; i++) {
     });
 }
 
-// EXACTLY 10 orbs
+// ✅ 15 ORBS
 let orbs = [];
-for (let i = 0; i < 10; i++) {
+for (let i = 0; i < 15; i++) {
     orbs.push({
         x: Math.random() * worldWidth,
         y: Math.random() * 350,
@@ -111,10 +130,12 @@ for (let i = 0; i < 10; i++) {
 // Red orb
 let redOrb = null;
 setInterval(() => {
-    redOrb = {
-        x: Math.random() * worldWidth,
-        y: Math.random() * 350
-    };
+    if (!dead) {
+        redOrb = {
+            x: Math.random() * worldWidth,
+            y: Math.random() * 350
+        };
+    }
 }, 10000);
 
 function rectCollision(a, b) {
@@ -124,7 +145,14 @@ function rectCollision(a, b) {
            a.y + a.h > b.y;
 }
 
+function die() {
+    dead = true;
+    crashScreen.style.display = "block"; // 💀 whiteout
+}
+
 function update() {
+    if (dead) return;
+
     // Movement
     if (keys["a"]) player.vx = -5;
     else if (keys["d"]) player.vx = 5;
@@ -170,7 +198,7 @@ function update() {
         if (k.x < 0 || k.x > worldWidth) k.dir *= -1;
 
         if (rectCollision(player, k)) {
-            location.reload(); // HARD RESET
+            die(); // 💀 no reload
         }
     });
 
@@ -189,16 +217,16 @@ function update() {
     }
 
     // Win
-    if (orbsCollected >= 10) {
+    if (orbsCollected >= 15) {
         document.getElementById("winScreen").style.display = "block";
     }
 
     cameraX = player.x - 200;
 }
 
-// Build platform with click
+// Build platform
 canvas.addEventListener("click", e => {
-    if (buildCharges > 0) {
+    if (buildCharges > 0 && !dead) {
         let rect = canvas.getBoundingClientRect();
         let x = e.clientX - rect.left + cameraX;
         let y = e.clientY - rect.top;
@@ -209,6 +237,8 @@ canvas.addEventListener("click", e => {
 });
 
 function draw() {
+    if (dead) return;
+
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     ctx.save();
@@ -248,7 +278,7 @@ function draw() {
 
     // UI
     ctx.fillStyle = "white";
-    ctx.fillText("Orbs: " + orbsCollected + "/10", 20, 20);
+    ctx.fillText("Orbs: " + orbsCollected + "/15", 20, 20);
     ctx.fillText("Build Charges: " + buildCharges, 20, 40);
 }
 
