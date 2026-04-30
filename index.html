@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Journey - P1</title>
+<style>
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: linear-gradient(135deg, #0f172a, #1e293b);
+    color: white;
+    overflow: hidden;
+}
+
+h1 {
+    position: absolute;
+    top: 20px;
+    width: 100%;
+    text-align: center;
+    font-size: 2.5rem;
+}
+
+#gameCanvas {
+    display: block;
+    margin: 0 auto;
+    background: #020617;
+    border: 2px solid #334155;
+}
+
+#winScreen {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    display: none;
+}
+</style>
+</head>
+<body>
+
+<h1>The Journey - P1</h1>
+<canvas id="gameCanvas" width="1000" height="500"></canvas>
+
+<div id="winScreen">
+    <h2>You did it.</h2>
+    <p>Secret Code: !K32NjM.S[E/p@</p>
+</div>
+
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+let player = {
+    x: 50,
+    y: 400,
+    w: 20,
+    h: 20,
+    vx: 0,
+    vy: 0,
+    grounded: false
+};
+
+let gravity = 0.6;
+let keys = {};
+let cameraX = 0;
+let orbsCollected = 0;
+let buildCharges = 0;
+
+let worldWidth = 5000;
+
+// Platforms
+let platforms = [];
+for (let i = 0; i < 100; i++) {
+    platforms.push({ x: i * 50, y: 450, w: 50, h: 50 });
+}
+
+// Floating platforms
+for (let i = 0; i < 50; i++) {
+    platforms.push({
+        x: Math.random() * worldWidth,
+        y: Math.random() * 350,
+        w: 100,
+        h: 20
+    });
+}
+
+// Killbricks
+let killbricks = [];
+for (let i = 0; i < 20; i++) {
+    killbricks.push({
+        x: Math.random() * worldWidth,
+        y: Math.random() * 400,
+        w: 40,
+        h: 40,
+        dir: Math.random() > 0.5 ? 1 : -1
+    });
+}
+
+// EXACTLY 10 orbs
+let orbs = [];
+for (let i = 0; i < 10; i++) {
+    orbs.push({
+        x: Math.random() * worldWidth,
+        y: Math.random() * 350,
+        collected: false
+    });
+}
+
+// Red orb
+let redOrb = null;
+setInterval(() => {
+    redOrb = {
+        x: Math.random() * worldWidth,
+        y: Math.random() * 350
+    };
+}, 10000);
+
+function rectCollision(a, b) {
+    return a.x < b.x + b.w &&
+           a.x + a.w > b.x &&
+           a.y < b.y + b.h &&
+           a.y + a.h > b.y;
+}
+
+function update() {
+    // Movement
+    if (keys["a"]) player.vx = -5;
+    else if (keys["d"]) player.vx = 5;
+    else player.vx = 0;
+
+    if (keys["w"] && player.grounded) {
+        player.vy = -12;
+        player.grounded = false;
+    }
+
+    player.vy += gravity;
+
+    player.x += player.vx;
+
+    // Horizontal collision
+    platforms.forEach(p => {
+        if (rectCollision(player, p)) {
+            if (player.vx > 0) player.x = p.x - player.w;
+            if (player.vx < 0) player.x = p.x + p.w;
+        }
+    });
+
+    player.y += player.vy;
+
+    // Vertical collision
+    player.grounded = false;
+    platforms.forEach(p => {
+        if (rectCollision(player, p)) {
+            if (player.vy > 0) {
+                player.y = p.y - player.h;
+                player.vy = 0;
+                player.grounded = true;
+            } else if (player.vy < 0) {
+                player.y = p.y + p.h;
+                player.vy = 0;
+            }
+        }
+    });
+
+    // Killbricks
+    killbricks.forEach(k => {
+        k.x += k.dir * 2;
+        if (k.x < 0 || k.x > worldWidth) k.dir *= -1;
+
+        if (rectCollision(player, k)) {
+            location.reload(); // HARD RESET
+        }
+    });
+
+    // Blue orbs
+    orbs.forEach(o => {
+        if (!o.collected && rectCollision(player, {x:o.x, y:o.y, w:15, h:15})) {
+            o.collected = true;
+            orbsCollected++;
+        }
+    });
+
+    // Red orb
+    if (redOrb && rectCollision(player, {x:redOrb.x, y:redOrb.y, w:15, h:15})) {
+        buildCharges++;
+        redOrb = null;
+    }
+
+    // Win
+    if (orbsCollected >= 10) {
+        document.getElementById("winScreen").style.display = "block";
+    }
+
+    cameraX = player.x - 200;
+}
+
+// Build platform with click
+canvas.addEventListener("click", e => {
+    if (buildCharges > 0) {
+        let rect = canvas.getBoundingClientRect();
+        let x = e.clientX - rect.left + cameraX;
+        let y = e.clientY - rect.top;
+
+        platforms.push({ x: x - 40, y: y - 10, w: 80, h: 20 });
+        buildCharges--;
+    }
+});
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    ctx.save();
+    ctx.translate(-cameraX, 0);
+
+    // Platforms
+    ctx.fillStyle = "#334155";
+    platforms.forEach(p => ctx.fillRect(p.x, p.y, p.w, p.h));
+
+    // Killbricks
+    ctx.fillStyle = "red";
+    killbricks.forEach(k => ctx.fillRect(k.x, k.y, k.w, k.h));
+
+    // Blue orbs
+    ctx.fillStyle = "cyan";
+    orbs.forEach(o => {
+        if (!o.collected) {
+            ctx.beginPath();
+            ctx.arc(o.x, o.y, 7, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    });
+
+    // Red orb
+    if (redOrb) {
+        ctx.fillStyle = "red";
+        ctx.beginPath();
+        ctx.arc(redOrb.x, redOrb.y, 7, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Player
+    ctx.fillStyle = "white";
+    ctx.fillRect(player.x, player.y, player.w, player.h);
+
+    ctx.restore();
+
+    // UI
+    ctx.fillStyle = "white";
+    ctx.fillText("Orbs: " + orbsCollected + "/10", 20, 20);
+    ctx.fillText("Build Charges: " + buildCharges, 20, 40);
+}
+
+function loop() {
+    update();
+    draw();
+    requestAnimationFrame(loop);
+}
+
+window.addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
+window.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
+
+loop();
+</script>
+
+</body>
+</html>
