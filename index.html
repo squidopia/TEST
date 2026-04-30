@@ -38,7 +38,6 @@ h1 {
     display: none;
 }
 
-/* 💀 Fake crash screen */
 #crashScreen {
     position: absolute;
     top: 0;
@@ -84,18 +83,19 @@ let keys = {};
 let cameraX = 0;
 
 let orbsCollected = 0;
-let buildCharges = 1; // ✅ start with 1
+let buildCharges = 1;
 
-let worldWidth = 5000;
+let worldWidth = 4000;
 let dead = false;
 
-// Platforms
+// ==========================
+// PLATFORMS
+// ==========================
 let platforms = [];
 for (let i = 0; i < 100; i++) {
     platforms.push({ x: i * 50, y: 450, w: 50, h: 50 });
 }
 
-// Floating platforms
 for (let i = 0; i < 50; i++) {
     platforms.push({
         x: Math.random() * worldWidth,
@@ -105,7 +105,59 @@ for (let i = 0; i < 50; i++) {
     });
 }
 
-// Killbricks
+// ==========================
+// HELPERS
+// ==========================
+function rectCollision(a, b) {
+    return a.x < b.x + b.w &&
+           a.x + a.w > b.x &&
+           a.y < b.y + b.h &&
+           a.y + a.h > b.y;
+}
+
+function isInsidePlatform(x, y, size) {
+    return platforms.some(p =>
+        rectCollision({x, y, w:size, h:size}, p)
+    );
+}
+
+// ==========================
+// ORBS (FIXED SPAWN)
+// ==========================
+const ORB_SIZE = 24; // 👈 bigger hitbox
+
+function getSafeOrb() {
+    let tries = 0;
+
+    while (tries < 1000) {
+        let orb = {
+            x: Math.random() * worldWidth,
+            y: Math.random() * 350,
+            collected: false
+        };
+
+        if (!isInsidePlatform(orb.x, orb.y, ORB_SIZE)) {
+            return orb;
+        }
+
+        tries++;
+    }
+
+    return {
+        x: 100,
+        y: 100,
+        collected: false
+    };
+}
+
+let orbs = [];
+for (let i = 0; i < 15; i++) {
+    orbs.push(getSafeOrb());
+}
+
+// ==========================
+// KILLBRICKS
+// ==========================
 let killbricks = [];
 for (let i = 0; i < 20; i++) {
     killbricks.push({
@@ -117,43 +169,38 @@ for (let i = 0; i < 20; i++) {
     });
 }
 
-// ✅ 15 ORBS
-let orbs = [];
-for (let i = 0; i < 15; i++) {
-    orbs.push({
-        x: Math.random() * worldWidth,
-        y: Math.random() * 350,
-        collected: false
-    });
-}
-
-// Red orb
+// ==========================
+// RED ORB
+// ==========================
 let redOrb = null;
 setInterval(() => {
     if (!dead) {
-        redOrb = {
-            x: Math.random() * worldWidth,
-            y: Math.random() * 350
-        };
+        let temp;
+        let tries = 0;
+
+        do {
+            temp = {
+                x: Math.random() * worldWidth,
+                y: Math.random() * 350
+            };
+            tries++;
+        } while (isInsidePlatform(temp.x, temp.y, 15) && tries < 1000);
+
+        redOrb = temp;
     }
 }, 10000);
 
-function rectCollision(a, b) {
-    return a.x < b.x + b.w &&
-           a.x + a.w > b.x &&
-           a.y < b.y + b.h &&
-           a.y + a.h > b.y;
-}
-
+// ==========================
+// GAME LOOP
+// ==========================
 function die() {
     dead = true;
-    crashScreen.style.display = "block"; // 💀 whiteout
+    crashScreen.style.display = "block";
 }
 
 function update() {
     if (dead) return;
 
-    // Movement
     if (keys["a"]) player.vx = -5;
     else if (keys["d"]) player.vx = 5;
     else player.vx = 0;
@@ -164,10 +211,8 @@ function update() {
     }
 
     player.vy += gravity;
-
     player.x += player.vx;
 
-    // Horizontal collision
     platforms.forEach(p => {
         if (rectCollision(player, p)) {
             if (player.vx > 0) player.x = p.x - player.w;
@@ -177,7 +222,6 @@ function update() {
 
     player.y += player.vy;
 
-    // Vertical collision
     player.grounded = false;
     platforms.forEach(p => {
         if (rectCollision(player, p)) {
@@ -192,31 +236,30 @@ function update() {
         }
     });
 
-    // Killbricks
     killbricks.forEach(k => {
         k.x += k.dir * 2;
         if (k.x < 0 || k.x > worldWidth) k.dir *= -1;
 
-        if (rectCollision(player, k)) {
-            die(); // 💀 no reload
-        }
+        if (rectCollision(player, k)) die();
     });
 
-    // Blue orbs
+    // ORBS (LARGER HITBOX)
     orbs.forEach(o => {
-        if (!o.collected && rectCollision(player, {x:o.x, y:o.y, w:15, h:15})) {
+        if (!o.collected && rectCollision(
+            player,
+            { x: o.x, y: o.y, w: ORB_SIZE, h: ORB_SIZE }
+        )) {
             o.collected = true;
             orbsCollected++;
         }
     });
 
-    // Red orb
+    // RED ORB
     if (redOrb && rectCollision(player, {x:redOrb.x, y:redOrb.y, w:15, h:15})) {
         buildCharges++;
         redOrb = null;
     }
 
-    // Win
     if (orbsCollected >= 15) {
         document.getElementById("winScreen").style.display = "block";
     }
@@ -224,7 +267,9 @@ function update() {
     cameraX = player.x - 200;
 }
 
-// Build platform
+// ==========================
+// BUILD
+// ==========================
 canvas.addEventListener("click", e => {
     if (buildCharges > 0 && !dead) {
         let rect = canvas.getBoundingClientRect();
@@ -236,23 +281,22 @@ canvas.addEventListener("click", e => {
     }
 });
 
+// ==========================
+// DRAW
+// ==========================
 function draw() {
     if (dead) return;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
     ctx.save();
     ctx.translate(-cameraX, 0);
 
-    // Platforms
     ctx.fillStyle = "#334155";
     platforms.forEach(p => ctx.fillRect(p.x, p.y, p.w, p.h));
 
-    // Killbricks
     ctx.fillStyle = "red";
     killbricks.forEach(k => ctx.fillRect(k.x, k.y, k.w, k.h));
 
-    // Blue orbs
     ctx.fillStyle = "cyan";
     orbs.forEach(o => {
         if (!o.collected) {
@@ -262,7 +306,6 @@ function draw() {
         }
     });
 
-    // Red orb
     if (redOrb) {
         ctx.fillStyle = "red";
         ctx.beginPath();
@@ -270,14 +313,11 @@ function draw() {
         ctx.fill();
     }
 
-    // Player
     ctx.fillStyle = "white";
     ctx.fillRect(player.x, player.y, player.w, player.h);
 
     ctx.restore();
 
-    // UI
-    ctx.fillStyle = "white";
     ctx.fillText("Orbs: " + orbsCollected + "/15", 20, 20);
     ctx.fillText("Build Charges: " + buildCharges, 20, 40);
 }
